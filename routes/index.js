@@ -840,7 +840,7 @@ router.post('/api/member/queryOrderAlipay', (req, res) => {
             });
         });
 
-})
+});
 /*********************************** 用户中心 **************************************** */
 
 /**    
@@ -870,7 +870,7 @@ router.post('/api/create_receive_info', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 获取收货地址数据
@@ -893,7 +893,7 @@ router.get('/api/receive_info', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 修改收货地址数据
@@ -921,7 +921,7 @@ router.post('/api/update_receive_info', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 删除收货地址数据
@@ -944,7 +944,7 @@ router.post('/api/delete_receive_info', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 订单记录查看
@@ -966,14 +966,14 @@ router.get('/api/check_shopping_record', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 订单取消
  */
 router.post('/api/cancel_shopping_record', (req, res) => {
     let id = req.body.id;
-    let sqlStr = "update shopping_record set state = 2 where id = " + id;
+    let sqlStr = "update shopping_record set status = 2 where id = " + id;
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
@@ -988,14 +988,14 @@ router.post('/api/cancel_shopping_record', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 订单付款完成
  */
 router.post('/api/finish_shopping', (req, res) => {
     let id = req.body.id;
-    let sqlStr = "update shopping_record set state = 1 where id =" + id;
+    let sqlStr = "update shopping_record set status = 1 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
@@ -1010,7 +1010,7 @@ router.post('/api/finish_shopping', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 单条订单记录删除
@@ -1018,7 +1018,7 @@ router.post('/api/finish_shopping', (req, res) => {
 router.post('/api/delete_shopping_record', (req, res) => {
     let id = req.body.id;
     //并非真的删除记录，只是不再给用户显示
-    let sqlStr = "update shopping_record set state = 3 where id =" + id;
+    let sqlStr = "update shopping_record set status = 3 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
@@ -1033,7 +1033,7 @@ router.post('/api/delete_shopping_record', (req, res) => {
             });
         }
     });
-})
+});
 
 /**    
  * 全部订单记录删除
@@ -1041,7 +1041,7 @@ router.post('/api/delete_shopping_record', (req, res) => {
 router.post('/api/delete_All_shopping_record', (req, res) => {
     let user_id = req.body.user_id;
     //并非真的删除记录，只是不再给用户显示
-    let sqlStr = "update shopping_record set state = 3 where user_id =" + user_id;
+    let sqlStr = "update shopping_record set status = 3 where user_id =" + user_id;
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
@@ -1056,7 +1056,7 @@ router.post('/api/delete_All_shopping_record', (req, res) => {
             });
         }
     });
-})
+});
 
 /**
  * 修改用户信息 
@@ -1290,7 +1290,7 @@ router.post('/api/change_goods_count', (req, res) => {
  */
 router.get('/api/admin_allusers', (req, res) => {
 
-    let sqlStr = 'SELECT id, user_name, user_phone, user_nickname, user_address FROM user_info';
+    let sqlStr = 'SELECT id, user_name, user_phone, user_nickname, user_address, user_status FROM user_info';
 
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
@@ -1376,6 +1376,33 @@ router.post('/api/update_recom_goods', (req, res) => {
 });
 
 /**
+ * 修改recommend商品折扣 
+ */
+ router.post('/api/goods_discount', (req, res) => {
+    // 获取数据
+    let goods_id = req.body.goods_id;
+    let discount  = req.body.discount;
+    let cut_count = req.body.cut_count;
+    let cut_price = req.body.cut_price;
+    let sqlStr = "UPDATE recommend SET discount = ?, cut_count = ?, cut_price = ? WHERE goods_id = " + goods_id;
+    let strParams = [discount, cut_count, cut_price];
+    conn.query(sqlStr, strParams, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '修改失败!'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: '修改成功!'
+            });
+        }
+    });
+});
+
+/**
  * 添加商品到recommend
  */
 router.post('/api/add_shop_recom', (req, res) => {
@@ -1392,7 +1419,9 @@ router.post('/api/add_shop_recom', (req, res) => {
         let short_name = fields.short_name;
         let price = fields.price;
         let normal_price = price + 300;
-        let market_price = price + 500;
+        let discount = 100;
+        let cut_count = 0;
+        let cut_price = 0;
         let sales_tip = fields.sales_tip;
         let category = fields.category;
         let comments_count = 0;
@@ -1416,8 +1445,8 @@ router.post('/api/add_shop_recom', (req, res) => {
                         message: '该商品已在数据库中'
                     });
                 } else { // 商品不存在
-                    let add_sql = "INSERT INTO recommend(goods_id, goods_name, short_name, thumb_url, image_url, hd_thumb_url, price, normal_price, market_price, sales_tip, category, counts, comments_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                    let sql_params = [goods_id, goods_name, short_name, thumb_url, image_url, hd_thumb_url, price, normal_price, market_price, sales_tip, category, counts, comments_count];
+                    let add_sql = "INSERT INTO recommend(goods_id, goods_name, short_name, thumb_url, image_url, hd_thumb_url, price, normal_price, discount, cut_count, cut_price, sales_tip, category, counts, comments_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    let sql_params = [goods_id, goods_name, short_name, thumb_url, image_url, hd_thumb_url, price, normal_price, discount, cut_count, cut_price, sales_tip, category, counts, comments_count];
                     conn.query(add_sql, sql_params, (error, results, fields) => {
                         if (error) {
                             console.log(error);
@@ -1470,5 +1499,69 @@ router.post('/api/delete_all_goods', (req, res) => {
     });
 
 });
+
+/**
+ * 冻结用户
+ */
+router.post('/api/frozen_user',(req,res)=>{
+       let id = req.body.id;
+       let sqlStr = "update user_info set user_status = 0 where id =" +id ;
+       conn.query(sqlStr,(error,results,fields)=>{
+           if(error){
+            res.json({
+                err_code: 0,
+                message: '冻结失败!'
+            });
+           }else{
+            res.json({
+                success_code: 200,
+                message: '冻结成功!'
+            });  
+           }
+       });
+});
+
+/**
+ * 恢复用户
+ */
+ router.post('/api/recovery_user',(req,res)=>{
+    let id = req.body.id;
+    let sqlStr = "update user_info set user_status = 1 where id =" +id ;
+    conn.query(sqlStr,(error,results,fields)=>{
+        if(error){
+         res.json({
+             err_code: 0,
+             message: '恢复失败!'
+         });
+        }else{
+         res.json({
+             success_code: 200,
+             message: '恢复成功!'
+         });  
+        }
+    });
+});
+
+/**    
+ * 获取所有订单
+ */
+ router.get('/api/all_shopping_record', (req, res) => {
+    let sqlStr = "select * from shopping_record ";
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '查看订单数据失败'
+            });
+        } else {
+            results = JSON.parse(JSON.stringify(results));
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+})
 
 export default router;
