@@ -552,6 +552,7 @@ router.post('/api/add_shop_cart', (req, res) => {
     let goods_name = req.body.goods_name;
     let thumb_url = req.body.thumb_url;
     let price = req.body.price;
+    let total_amount = req.body.total_amount;
     let buy_count = req.body.buy_count;
     let is_pay = 0; // 0 未购买 1购买
     let counts = req.body.counts;
@@ -571,8 +572,8 @@ router.post('/api/add_shop_cart', (req, res) => {
                     message: '该商品已在购物车中'
                 });
             } else { // 商品不存在
-    let add_sql = "INSERT INTO cart(goods_id, goods_name, thumb_url, price, buy_count, is_pay, user_id, counts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-    let sql_params = [goods_id, goods_name, thumb_url, price, buy_count, is_pay, user_id, counts];
+    let add_sql = "INSERT INTO cart(goods_id, goods_name, thumb_url, price, buy_count, total_amount, is_pay, user_id, counts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    let sql_params = [goods_id, goods_name, thumb_url, price, buy_count, total_amount, is_pay, user_id, counts];
                 conn.query(add_sql, sql_params, (error, results, fields) => {
                     if (error) {
                         res.json({
@@ -641,41 +642,24 @@ router.post('/api/delete_goods', (req, res) => {
     });
 });
 
-/**
- * 获取id值
- */
-function getId() {
-    let id;
-    let sql = "select MAX(id) from shopping_record";
-    conn.query(sql, (error, results, fields) => {
-        if (!error) {
-            results = JSON.parse(JSON.stringify(results));
-            if (results.id == null) {
-                id = 1;
-            } else {
-                id++;
-            }
-        }
-    });
-    return id;
-}
+
 /**
  * 生成交易订单
  */
 router.post('/api/create_trade', (req, res) => {
     let id;
-    let user_id = req.body.params.user_id;
-    let goods_name = req.body.params.goods_name;
-    let buy_price = req.body.params.buy_price;
-    let buy_count = req.body.params.buy_count;
-    let total_amount = req.body.params.total_amount;
-    let state = req.body.params.state;
-    let goods_img = req.body.params.goods_img;
-    let receive_address = req.body.params.receive_address;
-    let receive_name = req.body.params.receive_name;
-    let receive_phone = req.body.params.receive_phone;
-    let remark = req.body.params.remark;
-    let paymentWay = req.body.params.paymentWay;
+    let user_id = req.body.user_id;
+    let goods_name = req.body.goods_name;
+    let buy_price = req.body.buy_price;
+    let buy_count = req.body.buy_count;
+    let total_amount = req.body.total_amount;
+    let status = req.body.status;
+    let goods_img = req.body.goods_img;
+    let receive_address = req.body.receive_address;
+    let receive_name = req.body.receive_name;
+    let receive_phone = req.body.receive_phone;
+    let remark = req.body.remark;
+    let paymentWay = req.body.paymentWay;
     let sql = "select MAX(id) from shopping_record";
     conn.query(sql, (error, results, fields) => {
         let Max = Number(Object.values(results[0]));
@@ -695,14 +679,15 @@ router.post('/api/create_trade', (req, res) => {
             //生成订单编号
             let end = '00000' + id;
             let order_number = 'LGSC-' + Y + M + D + '-' + end.substr(end.length - 5, 5);
-            let addsqlStr = "INSERT INTO shopping_record (id,user_id,goods_name,create_date,order_number,buy_price,buy_count,total_amount,state,goods_img,receive_address,receive_name,receive_phone,remark,paymentWay) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-            let addsqlStrParams = [id, user_id, goods_name, create_date, order_number, buy_price, buy_count, total_amount, state, goods_img, receive_address, receive_name, receive_phone, remark, paymentWay];
+            let addsqlStr = "INSERT INTO shopping_record (id,user_id,goods_name,create_date,order_number,buy_price,buy_count,total_amount,status,goods_img,receive_address,receive_name,receive_phone,remark,paymentWay) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            let addsqlStrParams = [id, user_id, goods_name, create_date, order_number, buy_price, buy_count, total_amount, status, goods_img, receive_address, receive_name, receive_phone, remark, paymentWay];
             conn.query(addsqlStr, addsqlStrParams, (error, results, fields) => {
                 if (!error) {
                     results = JSON.parse(JSON.stringify(results));
                     res.json({
                         success_code: 200,
-                        message: '订单生成成功'
+                        message: '订单生成成功',
+                        data:id
                     });
                 } else {
                     res.json({
@@ -946,12 +931,13 @@ router.post('/api/delete_receive_info', (req, res) => {
     });
 });
 
-/**    
+/**  
+ * 订单管理 status状态：0 未付款、10 已付款已完成、11 已付款未发货、12 已付款已发货、13 已付款已送达、14 已付款已收货、20 未付款已取消、21 已付款退款中、22 已付款已退款、3 用户删除记录 
  * 订单记录查看
  */
 router.get('/api/check_shopping_record', (req, res) => {
     let user_id = req.query.user_id;
-    let sqlStr = "select * from shopping_record where user_id =" + user_id + " AND state != 3";
+    let sqlStr = "select * from shopping_record where user_id =" + user_id + " AND status != 3";
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
@@ -969,17 +955,17 @@ router.get('/api/check_shopping_record', (req, res) => {
 });
 
 /**    
- * 订单取消
+ * 订单取消，20 未付款已取消
  */
 router.post('/api/cancel_shopping_record', (req, res) => {
     let id = req.body.id;
-    let sqlStr = "update shopping_record set status = 2 where id = " + id;
+    let sqlStr = "update shopping_record set status = 20 where id = " + id;
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
             res.json({
                 err_code: 0,
-                message: id
+                message: '订单取消失败'
             });
         } else {
             res.json({
@@ -991,11 +977,77 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 });
 
 /**    
- * 订单付款完成
+ * 订单取消，21 已付款退款中
  */
-router.post('/api/finish_shopping', (req, res) => {
+ router.post('/api/refund_first', (req, res) => {
     let id = req.body.id;
-    let sqlStr = "update shopping_record set status = 1 where id =" + id;
+    let sqlStr = "update shopping_record set status = 21 where id = " + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '订单申请退款失败'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+});
+
+/**    
+ * 订单取消，22 已付款已退款
+ */
+ router.post('/api/refund_second', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update shopping_record set status = 22 where id = " + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '订单退款失败'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+});
+
+/**    
+ * 订单 11 已付款未发货
+ */
+ router.post('/api/shopping_step_one', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update shopping_record set status = 11 where id =" + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '订单发货失败'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+});
+
+/**    
+ * 订单 12 已付款已发货
+ */
+ router.post('/api/shopping_step_two', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update shopping_record set status = 12 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
             console.log(error);
@@ -1012,8 +1064,75 @@ router.post('/api/finish_shopping', (req, res) => {
     });
 });
 
+
 /**    
- * 单条订单记录删除
+ * 订单 13 已付款已送达
+ */
+ router.post('/api/shopping_step_three', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update shopping_record set status = 13 where id =" + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '订单送达失败'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+});
+
+/**    
+ * 订单 14 已付款已收货
+ */
+ router.post('/api/shopping_step_four', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update shopping_record set status = 14 where id =" + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '订单收货失败'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+});
+
+/**    
+ * 订单 10 已付款已完成
+ */
+router.post('/api/finish_shopping', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update shopping_record set status = 10 where id =" + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            console.log(error);
+            res.json({
+                err_code: 0,
+                message: '订单完成失败'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: results
+            });
+        }
+    });
+});
+
+/**    
+ * 单条订单记录删除 3 用户删除记录
  */
 router.post('/api/delete_shopping_record', (req, res) => {
     let id = req.body.id;
@@ -1036,7 +1155,7 @@ router.post('/api/delete_shopping_record', (req, res) => {
 });
 
 /**    
- * 全部订单记录删除
+ * 全部订单记录删除 3 用户删除记录
  */
 router.post('/api/delete_All_shopping_record', (req, res) => {
     let user_id = req.body.user_id;
