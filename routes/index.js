@@ -326,22 +326,28 @@ router.post('/api/login_code', (req, res) => {
         } else {
             results = JSON.parse(JSON.stringify(results));
             if (results[0]) { // 用户已经存在
-                req.session.userId = results[0].id;
-
-                res.json({
-                    success_code: 200,
-                    message: {
-                        id: results[0].id,
-                        user_name: results[0].user_name,
-                        user_nickname: results[0].user_nickname || '',
-                        user_phone: results[0].user_phone,
-                        user_sex: results[0].user_sex,
-                        user_address: results[0].user_address,
-                        user_sign: results[0].user_sign,
-                        user_birthday: results[0].user_birthday,
-                        user_avatar: results[0].user_avatar
-                    }
-                });
+                if (results[0].user_status == 0) {
+                    res.json({
+                        err_code: 301,
+                        message: '用户已冻结!'
+                    });
+                } else {
+                    req.session.userId = results[0].id;
+                    res.json({
+                        success_code: 200,
+                        message: {
+                            id: results[0].id,
+                            user_name: results[0].user_name,
+                            user_nickname: results[0].user_nickname || '',
+                            user_phone: results[0].user_phone,
+                            user_sex: results[0].user_sex,
+                            user_address: results[0].user_address,
+                            user_sign: results[0].user_sign,
+                            user_birthday: results[0].user_birthday,
+                            user_avatar: results[0].user_avatar
+                        }
+                    });
+                }
             } else { // 新用户
                 const addSql = "INSERT INTO user_info(user_name, user_phone, user_avatar) VALUES (?, ?, ?)";
                 const addSqlParams = [phone, phone, 'http://localhost:' + config.port + '/avatar_uploads/avatar_default.jpg']; // 手机验证码注册，默认用手机号充当用户名
@@ -411,32 +417,37 @@ router.post('/api/login_pwd', (req, res) => {
             });
         } else {
             results = JSON.parse(JSON.stringify(results));
-
             if (results[0]) { // 用户已经存在
-                // 验证密码是否正确
-                if (results[0].user_pwd !== user_pwd) {
+                if (results[0].user_status == 0) {
                     res.json({
-                        err_code: 0,
-                        message: '密码不正确!'
+                        err_code: 301,
+                        message: '用户已冻结!'
                     });
                 } else {
-                    req.session.userId = results[0].id;
-
-                    res.json({
-                        success_code: 200,
-                        message: {
-                            id: results[0].id,
-                            user_name: results[0].user_name || '',
-                            user_nickname: results[0].user_nickname || '',
-                            user_phone: results[0].user_phone || '',
-                            user_sex: results[0].user_sex || '',
-                            user_address: results[0].user_address || '',
-                            user_sign: results[0].user_sign || '',
-                            user_birthday: results[0].user_birthday || '',
-                            user_avatar: results[0].user_avatar || ''
-                        },
-                        info: '登录成功!'
-                    });
+                    // 验证密码是否正确
+                    if (results[0].user_pwd !== user_pwd) {
+                        res.json({
+                            err_code: 0,
+                            message: '密码不正确!'
+                        });
+                    } else {
+                        req.session.userId = results[0].id;
+                        res.json({
+                            success_code: 200,
+                            message: {
+                                id: results[0].id,
+                                user_name: results[0].user_name || '',
+                                user_nickname: results[0].user_nickname || '',
+                                user_phone: results[0].user_phone || '',
+                                user_sex: results[0].user_sex || '',
+                                user_address: results[0].user_address || '',
+                                user_sign: results[0].user_sign || '',
+                                user_birthday: results[0].user_birthday || '',
+                                user_avatar: results[0].user_avatar || ''
+                            },
+                            info: '登录成功!'
+                        });
+                    }
                 }
             } else { // 新用户
                 const addSql = "INSERT INTO user_info(user_name, user_pwd, user_avatar) VALUES (?, ?, ?)";
@@ -572,8 +583,8 @@ router.post('/api/add_shop_cart', (req, res) => {
                     message: '该商品已在购物车中'
                 });
             } else { // 商品不存在
-    let add_sql = "INSERT INTO cart(goods_id, goods_name, thumb_url, price, buy_count, total_amount, is_pay, user_id, counts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    let sql_params = [goods_id, goods_name, thumb_url, price, buy_count, total_amount, is_pay, user_id, counts];
+                let add_sql = "INSERT INTO cart(goods_id, goods_name, thumb_url, price, buy_count, total_amount, is_pay, user_id, counts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                let sql_params = [goods_id, goods_name, thumb_url, price, buy_count, total_amount, is_pay, user_id, counts];
                 conn.query(add_sql, sql_params, (error, results, fields) => {
                     if (error) {
                         res.json({
@@ -687,7 +698,7 @@ router.post('/api/create_trade', (req, res) => {
                     res.json({
                         success_code: 200,
                         message: '订单生成成功',
-                        data:id
+                        data: id
                     });
                 } else {
                     res.json({
@@ -832,29 +843,40 @@ router.post('/api/member/queryOrderAlipay', (req, res) => {
  * 收货地址信息生成
  */
 router.post('/api/create_receive_info', (req, res) => {
-    let id = req.body.id;
+    let id;
     let user_id = req.body.user_id;
-    let receive_name = req.body.receive_name;
-    let receive_address = req.body.receive_address;
-    let receive_phone = req.body.receive_phone;
-    let address_default = req.body.address_default;
-    let addsqlStr = "insert into receive_info(id,user_id,receive_name,receive_address,receive_phone,address_default) value(?,?,?,?,?,?)";
-    let addsqlStrParams = [id, user_id, receive_name, receive_address, receive_phone, address_default];
-    conn.query(addsqlStr, addsqlStrParams, (error, results, fields) => {
+    let receive_name = req.body.form.receive_name;
+    let receive_address = req.body.form.receive_address;
+    let receive_phone = req.body.form.receive_phone;
+    let address_default = req.body.form.address_default;
+    let sql = "select MAX(id) from receive_info";
+    conn.query(sql, (error, results, fields) => {
+        let Max = Number(Object.values(results[0]));
         if (!error) {
-            results = JSON.parse(JSON.stringify(results));
-            res.json({
-                success_code: 200,
-                message: '收货地址设置成功!'
-            });
-        } else {
-            console.log(error);
-            res.json({
-                err_code: 0,
-                message: '收货地址设置失败!'
-            });
+            if (Max === null) {
+                id = 1;
+            } else {
+                id = Max + 1;
+            }
         }
-    });
+        let addsqlStr = "insert into receive_info(id,user_id,receive_name,receive_address,receive_phone,address_default) value(?,?,?,?,?,?)";
+        let addsqlStrParams = [id, user_id, receive_name, receive_address, receive_phone, address_default];
+        conn.query(addsqlStr, addsqlStrParams, (error, results, fields) => {
+            if (!error) {
+                results = JSON.parse(JSON.stringify(results));
+                res.json({
+                    success_code: 200,
+                    message: '收货地址设置成功!'
+                });
+            } else {
+                console.log(error);
+                res.json({
+                    err_code: 0,
+                    message: '收货地址设置失败!'
+                });
+            }
+     });
+  });
 });
 
 /**    
@@ -884,11 +906,11 @@ router.get('/api/receive_info', (req, res) => {
  * 修改收货地址数据
  */
 router.post('/api/update_receive_info', (req, res) => {
-    let id = req.body.id;
-    let receive_name = req.body.receive_name;
-    let receive_address = req.body.receive_address;
-    let receive_phone = req.body.receive_phone;
-    let address_default = req.body.address_default;
+    let id = req.body.form.id;
+    let receive_name = req.body.form.receive_name;
+    let receive_address = req.body.form.receive_address;
+    let receive_phone = req.body.form.receive_phone;
+    let address_default = req.body.form.address_default;
     let sqlStr = "update receive_info set receive_name = ?, receive_address = ?,receive_phone = ?,address_default = ? where id =" + id;
     let sqlStrParams = [receive_name, receive_address, receive_phone, address_default];
     conn.query(sqlStr, sqlStrParams, (error, results, fields) => {
@@ -979,7 +1001,7 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 /**    
  * 订单取消，21 已付款退款中
  */
- router.post('/api/refund_first', (req, res) => {
+router.post('/api/refund_first', (req, res) => {
     let id = req.body.id;
     let sqlStr = "update shopping_record set status = 21 where id = " + id;
     conn.query(sqlStr, (error, results, fields) => {
@@ -1001,7 +1023,7 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 /**    
  * 订单取消，22 已付款已退款
  */
- router.post('/api/refund_second', (req, res) => {
+router.post('/api/refund_second', (req, res) => {
     let id = req.body.id;
     let sqlStr = "update shopping_record set status = 22 where id = " + id;
     conn.query(sqlStr, (error, results, fields) => {
@@ -1023,7 +1045,7 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 /**    
  * 订单 11 已付款未发货
  */
- router.post('/api/shopping_step_one', (req, res) => {
+router.post('/api/shopping_step_one', (req, res) => {
     let id = req.body.id;
     let sqlStr = "update shopping_record set status = 11 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
@@ -1045,7 +1067,7 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 /**    
  * 订单 12 已付款已发货
  */
- router.post('/api/shopping_step_two', (req, res) => {
+router.post('/api/shopping_step_two', (req, res) => {
     let id = req.body.id;
     let sqlStr = "update shopping_record set status = 12 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
@@ -1068,7 +1090,7 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 /**    
  * 订单 13 已付款已送达
  */
- router.post('/api/shopping_step_three', (req, res) => {
+router.post('/api/shopping_step_three', (req, res) => {
     let id = req.body.id;
     let sqlStr = "update shopping_record set status = 13 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
@@ -1090,7 +1112,7 @@ router.post('/api/cancel_shopping_record', (req, res) => {
 /**    
  * 订单 14 已付款已收货
  */
- router.post('/api/shopping_step_four', (req, res) => {
+router.post('/api/shopping_step_four', (req, res) => {
     let id = req.body.id;
     let sqlStr = "update shopping_record set status = 14 where id =" + id;
     conn.query(sqlStr, (error, results, fields) => {
@@ -1497,10 +1519,10 @@ router.post('/api/update_recom_goods', (req, res) => {
 /**
  * 修改recommend商品折扣 
  */
- router.post('/api/goods_discount', (req, res) => {
+router.post('/api/goods_discount', (req, res) => {
     // 获取数据
     let goods_id = req.body.goods_id;
-    let discount  = req.body.discount;
+    let discount = req.body.discount;
     let cut_count = req.body.cut_count;
     let cut_price = req.body.cut_price;
     let sqlStr = "UPDATE recommend SET discount = ?, cut_count = ?, cut_price = ? WHERE goods_id = " + goods_id;
@@ -1622,41 +1644,41 @@ router.post('/api/delete_all_goods', (req, res) => {
 /**
  * 冻结用户
  */
-router.post('/api/frozen_user',(req,res)=>{
-       let id = req.body.id;
-       let sqlStr = "update user_info set user_status = 0 where id =" +id ;
-       conn.query(sqlStr,(error,results,fields)=>{
-           if(error){
+router.post('/api/frozen_user', (req, res) => {
+    let id = req.body.id;
+    let sqlStr = "update user_info set user_status = 0 where id =" + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
             res.json({
                 err_code: 0,
                 message: '冻结失败!'
             });
-           }else{
+        } else {
             res.json({
                 success_code: 200,
                 message: '冻结成功!'
-            });  
-           }
-       });
+            });
+        }
+    });
 });
 
 /**
  * 恢复用户
  */
- router.post('/api/recovery_user',(req,res)=>{
+router.post('/api/recovery_user', (req, res) => {
     let id = req.body.id;
-    let sqlStr = "update user_info set user_status = 1 where id =" +id ;
-    conn.query(sqlStr,(error,results,fields)=>{
-        if(error){
-         res.json({
-             err_code: 0,
-             message: '恢复失败!'
-         });
-        }else{
-         res.json({
-             success_code: 200,
-             message: '恢复成功!'
-         });  
+    let sqlStr = "update user_info set user_status = 1 where id =" + id;
+    conn.query(sqlStr, (error, results, fields) => {
+        if (error) {
+            res.json({
+                err_code: 0,
+                message: '恢复失败!'
+            });
+        } else {
+            res.json({
+                success_code: 200,
+                message: '恢复成功!'
+            });
         }
     });
 });
@@ -1664,7 +1686,7 @@ router.post('/api/frozen_user',(req,res)=>{
 /**    
  * 获取所有订单
  */
- router.get('/api/all_shopping_record', (req, res) => {
+router.get('/api/all_shopping_record', (req, res) => {
     let sqlStr = "select * from shopping_record ";
     conn.query(sqlStr, (error, results, fields) => {
         if (error) {
